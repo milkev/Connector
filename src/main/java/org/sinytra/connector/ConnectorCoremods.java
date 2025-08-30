@@ -67,15 +67,13 @@ public class ConnectorCoremods implements ICoreMod {
                 method.visitVarInsn(Opcodes.ALOAD, 5);
                 // displayItemsGenerator
                 method.visitVarInsn(Opcodes.ALOAD, 6);
-                // backgroundLocation
-                method.visitTypeInsn(Opcodes.NEW, "net/minecraft/resources/ResourceLocation");
-                method.visitInsn(Opcodes.DUP);
-                method.visitLdcInsn("textures/gui/container/creative_inventory/tab_items.png");
-                method.visitMethodInsn(Opcodes.INVOKESPECIAL, "net/minecraft/resources/ResourceLocation", "<init>", "(Ljava/lang/String;)V", false);
+                // scrollerSpriteLocation
+                method.visitInsn(Opcodes.ACONST_NULL);
                 // hasSearchBar
                 method.visitInsn(Opcodes.ICONST_0);
                 // searchBarWidth
                 method.visitLdcInsn(89);
+                // tabsImage
                 method.visitFieldInsn(Opcodes.GETSTATIC, "net/minecraft/world/item/CreativeModeTab$Builder", "CREATIVE_INVENTORY_TABS_IMAGE", "Lnet/minecraft/resources/ResourceLocation;"); // tabsImage
                 // labelColor
                 method.visitLdcInsn(4210752);
@@ -98,9 +96,9 @@ public class ConnectorCoremods implements ICoreMod {
             }
         );
         List<ITransformer<?>> addedFields = List.of(
-            addFieldToClass("net.minecraft.client.particle.ParticleEngine", "providers", "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;", Opcodes.ACC_PRIVATE),
-            addFieldToClass("net.minecraft.client.color.block.BlockColors", "blockColors", "Lnet/minecraft/core/IdMapper;", Opcodes.ACC_PRIVATE),
-            addFieldToClass("net.minecraft.client.color.item.ItemColors", "itemColors", "Lnet/minecraft/core/IdMapper;", Opcodes.ACC_PRIVATE)
+            addOriginalSyntheticField("net.minecraft.client.particle.ParticleEngine", "providers", "Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;"),
+            addOriginalSyntheticField("net.minecraft.client.color.block.BlockColors", "blockColors", "Lnet/minecraft/core/IdMapper;"),
+            addOriginalSyntheticField("net.minecraft.client.color.item.ItemColors", "itemColors", "Lnet/minecraft/core/IdMapper;")
         );
         ITransformer<?> missingOrderingCall = new BaseTransformer<>(
             TargetType.METHOD,
@@ -142,12 +140,14 @@ public class ConnectorCoremods implements ICoreMod {
             .build();
     }
 
-    private static ITransformer<?> addFieldToClass(String cls, String name, String desc, int access) {
+    private static ITransformer<?> addOriginalSyntheticField(String cls, String name, String desc) {
         return new BaseTransformer<>(
             TargetType.CLASS,
             ITransformer.Target.targetClass(cls),
             input -> {
-                input.fields.add(new FieldNode(access, name, desc, null, null));
+                // Try to find the original field with the same name and copy its access modifiers (accounting for ATs/AWs, but removing final so it can be assigned within our mixin). If we cannot find it, we will use public non-final so that mods can access it.
+                var originalAccess = input.fields.stream().filter(f -> f.name.equals(name)).findFirst().map(f -> f.access).orElse(Opcodes.ACC_PUBLIC);
+                input.fields.add(new FieldNode((originalAccess & ~Opcodes.ACC_FINAL) | Opcodes.ACC_SYNTHETIC, name, desc, null, null));
 
                 LOGGER.debug("Added field {} to class {}", name, cls);
             }

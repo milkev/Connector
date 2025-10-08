@@ -103,6 +103,7 @@ publishing {
             from(components["shadow"])
         }
     }
+
     repositories {
         val env = System.getenv()
         if (env["MAVEN_URL"] != null) {
